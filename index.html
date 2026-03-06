@@ -480,6 +480,7 @@
         const googleProvider = new GoogleAuthProvider();
 
         const ADMIN_EMAIL = "thepremanshu@gmail.com";
+        const ADMIN_PWD = "wertty";
         
         const STATE = {
             user: null, isAdmin: false,
@@ -505,7 +506,10 @@
 
             onAuthStateChanged(auth, (user) => {
                 if (user) {
-                    STATE.user = user; STATE.isAdmin = (user.email === ADMIN_EMAIL);
+                    STATE.user = user; 
+                    // Verify Admin Status: Only if email matches AND session storage confirms correct password
+                    STATE.isAdmin = (user.email === ADMIN_EMAIL && sessionStorage.getItem('isAdminAuth') === 'true');
+                    
                     DOM.authScreen.style.display = 'none'; DOM.appScreen.style.display = 'flex';
                     DOM.userEmailDisplay.textContent = user.isAnonymous ? 'Guest User' : user.email;
                     DOM.btnSettings.style.display = STATE.isAdmin ? 'flex' : 'none';
@@ -546,16 +550,54 @@
 
         // Auth
         document.getElementById('btn-login').addEventListener('click', () => {
-            signInWithEmailAndPassword(auth, document.getElementById('auth-email').value, document.getElementById('auth-password').value)
+            const email = document.getElementById('auth-email').value;
+            const pwd = document.getElementById('auth-password').value;
+            
+            signInWithEmailAndPassword(auth, email, pwd)
+                .then(() => {
+                    // Store admin verification only if the exact combination is met
+                    if (email === ADMIN_EMAIL && pwd === ADMIN_PWD) {
+                        sessionStorage.setItem('isAdminAuth', 'true');
+                    } else {
+                        sessionStorage.removeItem('isAdminAuth');
+                    }
+                })
                 .catch(err => showToast(err.message, 'error'));
         });
+
         document.getElementById('btn-signup').addEventListener('click', () => {
-            createUserWithEmailAndPassword(auth, document.getElementById('auth-email').value, document.getElementById('auth-password').value)
-                .then(() => showToast("Account created successfully", 'success')).catch(err => showToast(err.message, 'error'));
+            const email = document.getElementById('auth-email').value;
+            const pwd = document.getElementById('auth-password').value;
+            
+            createUserWithEmailAndPassword(auth, email, pwd)
+                .then(() => {
+                    // Store admin verification only if the exact combination is met
+                    if (email === ADMIN_EMAIL && pwd === ADMIN_PWD) {
+                        sessionStorage.setItem('isAdminAuth', 'true');
+                    } else {
+                        sessionStorage.removeItem('isAdminAuth');
+                    }
+                    showToast("Account created successfully", 'success');
+                })
+                .catch(err => showToast(err.message, 'error'));
         });
-        document.getElementById('btn-google').addEventListener('click', () => signInWithPopup(auth, googleProvider).catch(err => showToast(err.message, 'error')));
-        document.getElementById('btn-guest').addEventListener('click', () => signInAnonymously(auth).catch(err => showToast(err.message, 'error')));
-        document.getElementById('btn-logout').addEventListener('click', () => customConfirm("Logout", "Are you sure you want to log out?", () => signOut(auth)));
+
+        document.getElementById('btn-google').addEventListener('click', () => {
+            sessionStorage.removeItem('isAdminAuth');
+            signInWithPopup(auth, googleProvider).catch(err => showToast(err.message, 'error'));
+        });
+
+        document.getElementById('btn-guest').addEventListener('click', () => {
+            sessionStorage.removeItem('isAdminAuth');
+            signInAnonymously(auth).catch(err => showToast(err.message, 'error'));
+        });
+
+        document.getElementById('btn-logout').addEventListener('click', () => {
+            customConfirm("Logout", "Are you sure you want to log out?", () => {
+                sessionStorage.removeItem('isAdminAuth'); // Clear Admin Authorization
+                signOut(auth);
+            });
+        });
 
         // Settings
         function syncSettingsFromCloud() {
